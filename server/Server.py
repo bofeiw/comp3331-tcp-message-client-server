@@ -8,6 +8,16 @@ import time
 import datetime as dt
 import json
 from CredentialManager import CredentialManager
+from UserManager import UserManager
+import sys
+
+# command line args
+if len(sys.argv) != 4:
+    print("invalid command line arguments")
+    exit(0)
+# server_port = int(sys.argv[1]) # TODO uncomment this
+block_duration = int(sys.argv[2])
+timeout = int(sys.argv[3])
 
 # Server will run on this port
 serverPort = 13856
@@ -16,10 +26,10 @@ t_lock = threading.Condition()
 clients = []
 # would communicate with clients after every second
 UPDATE_INTERVAL = 1
-timeout = False
 
 # credential manager
-credential_manager = CredentialManager()
+credential_manager = CredentialManager(block_duration, timeout)
+user_manager = UserManager(credential_manager)
 
 
 def recv_handler():
@@ -33,7 +43,6 @@ def recv_handler():
         # received data from the client, now we know who we are talking with
         message = message.decode()
         message = json.loads(message)
-        print(message)
         action = message["action"]
 
         # get lock as we might me accessing some shared data structures
@@ -51,14 +60,16 @@ def recv_handler():
                 password = message["password"]
                 clients.append(client_address)
                 status = credential_manager.authenticate(username, password)
+                credential_manager.set_address_username(client_address, username)
                 server_message["status"] = status
             elif action == 'logout':
                 # check if client already subscribed or not
+                credential_manager.set_offline(credential_manager.get_username(client_address))
                 if client_address in clients:
                     clients.remove(client_address)
-                    server_message["reply"] = "disconnected"
+                    server_message["reply"] = "logged out"
                 else:
-                    server_message["reply"] = "You are not currently subscribed"
+                    server_message["reply"] = "You are not logged in"
             else:
                 server_message["reply"] = "Unknown action"
             # send message to the client
@@ -74,7 +85,7 @@ def send_handler():
     global serverSocket
     global timeout
     # go through the list of the subscribed clients and send them the current time after every 1 second
-    while (1):
+    while 1:
         # get lock
         with t_lock:
             for i in clients:
@@ -105,3 +116,4 @@ send_thread.start()
 # this is the main thread
 while True:
     time.sleep(0.1)
+    credential_manager.update()
