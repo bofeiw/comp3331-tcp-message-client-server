@@ -38,9 +38,24 @@ def logout():
 
 def recv_handler():
     while True:
-        print("receiving")
         login_result, server_address = clientSocket.recvfrom(2048)
-        print(login_result.decode())
+        data = json.loads(login_result.decode())
+        print('\r',end='')
+        if data['action'] == 'message':
+            if data['status'] == 'MESSAGE_SELF':
+                print("Cannot message yourself.")
+            elif data['status'] == 'USER_NOT_EXIST':
+                print("User does not exist.")
+            elif data['status'] == 'USER_BLOCKED':
+                print("That user blocked you.")
+            elif data['status'] == 'SUCCESS':
+                pass
+        elif data['action'] == 'receive_message':
+            print(data["from"], ':', data['message'])
+        else:
+            print(data)
+        print('> ', end='')
+        sys.stdout.flush()
 
 
 def send_handler():
@@ -50,6 +65,13 @@ def send_handler():
         command = input("> ").strip()
         if command.startswith("logout"):
             to_exit = True
+        elif command.startswith("message"):
+            _, user, message = command.split(' ', 2)
+            clientSocket.sendto(json.dumps({
+                "action": "message",
+                "message": message,
+                "user": user
+            }).encode(), (serverName, serverPort))
 
 
 def interact():

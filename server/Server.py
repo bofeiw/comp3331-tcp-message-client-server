@@ -7,9 +7,9 @@ import threading
 import time
 import datetime as dt
 import json
-from CredentialManager import CredentialManager
 from UserManager import UserManager
 import sys
+from typing import List, Dict
 
 # command line args
 if len(sys.argv) != 4:
@@ -24,12 +24,20 @@ serverPort = 13856
 t_lock = threading.Condition()
 # will store clients info in this list
 clients = []
+# all unsent messages: from_user, to_user, message
+pending_messages: List[Dict] = []
 # would communicate with clients after every second
 UPDATE_INTERVAL = 1
 
 # credential manager
-credential_manager = CredentialManager(block_duration, timeout)
-user_manager = UserManager(credential_manager)
+user_manager = UserManager(block_duration, timeout)
+
+def send_message(from_user: str, to_user: str, message: str):
+    serverSocket.sendto(json.dumps({
+        'action': 'receive_message',
+        'from': from_user,
+        'message': message
+    }).encode(), user_manager.get_address(to_user))
 
 
 def recv_handler():
@@ -39,37 +47,58 @@ def recv_handler():
     global serverSocket
     print('Server is ready for service')
     while True:
-        message, client_address = serverSocket.recvfrom(2048)
+        data, client_address = serverSocket.recvfrom(2048)
         # received data from the client, now we know who we are talking with
-        message = message.decode()
-        message = json.loads(message)
-        action = message["action"]
+        data = data.decode()
+        data = json.loads(data)
+        action = data["action"]
 
         # get lock as we might me accessing some shared data structures
         with t_lock:
             currtime = dt.datetime.now()
             date_time = currtime.strftime("%d/%m/%Y, %H:%M:%S")
-            print('Received request from', client_address[0], 'listening at', client_address[1], ':', message,
+            print('Received request from', client_address[0], 'listening at', client_address[1], ':', data,
                   'at time ', date_time)
             server_message = dict()
-            server_message["type"] = "response"
             server_message["action"] = action
             if action == 'login':
                 # store client information (IP and Port No) in list
-                username = message["username"]
-                password = message["password"]
+                username = data["username"]
+                password = data["password"]
                 clients.append(client_address)
-                status = credential_manager.authenticate(username, password)
-                credential_manager.set_address_username(client_address, username)
+                status = user_manager.authenticate(username, password)
+                user_manager.set_address_username(client_address, username)
                 server_message["status"] = status
             elif action == 'logout':
                 # check if client already subscribed or not
-                credential_manager.set_offline(credential_manager.get_username(client_address))
+                user_manager.set_offline(user_manager.get_username(client_address))
                 if client_address in clients:
                     clients.remove(client_address)
                     server_message["reply"] = "logged out"
                 else:
                     server_message["reply"] = "You are not logged in"
+            elif action == 'message':
+                curr_user = user_manager.get_username(client_address)
+                username = data['user']
+                message = data['message']
+                if curr_user == username:
+                    server_message['status'] = 'MESSAGE_SELF'
+                elif not user_manager.has_user(username):
+                    server_message['status'] = 'USER_NOT_EXIST'
+                elif user_manager.is_blocked_user(curr_user, username):
+                    server_message['status'] = 'USER_BLOCKED'
+                else:
+                    server_message['status'] = 'SUCCESS'
+                    if user_manager.is_online(username):
+                        # send message to user
+                        send_message(curr_user, username, message)
+                    else:
+                        pending_messages.append({
+                            'from_user': curr_user,
+                            'to_user': username,
+                            'message': message
+                        })
+
             else:
                 server_message["reply"] = "Unknown action"
             # send message to the client
@@ -88,12 +117,10 @@ def send_handler():
     while 1:
         # get lock
         with t_lock:
-            for i in clients:
-                currtime = dt.datetime.now()
-                date_time = currtime.strftime("%d/%m/%Y, %H:%M:%S")
-                message = 'Current time is ' + date_time
-                # clientSocket.sendto(message.encode(), i)
-                # print('Sending time to', i[0], 'listening at', i[1], 'at time ', date_time)
+            for message in pending_messages:
+                if user_manager.is_online(message['to_user']):
+                    send_message(message['from_user'], message['to_user'], message['message'])
+                    pending_messages.remove(message)
             # notify other thread
             t_lock.notify()
         # sleep for UPDATE_INTERVAL
@@ -116,4 +143,4 @@ send_thread.start()
 # this is the main thread
 while True:
     time.sleep(0.1)
-    credential_manager.update()
+    user_manager.update()
