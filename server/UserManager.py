@@ -77,6 +77,9 @@ class UserManager:
     def is_online(self, username):
         return username in self.__user_map and self.__user_map[username].is_online()
 
+    def all_users(self) -> list:
+        return list(self.__user_map.keys())
+
     class __User:
         # manage username, password, online status, number of consecutive fail trials,
         # blocked timestamp of a particular user
@@ -97,7 +100,8 @@ class UserManager:
             self.__blocked_users.add(username)
 
         def unblock(self, username: str):
-            self.__blocked_users.remove(username)
+            if username in self.__blocked_users:
+                self.__blocked_users.remove(username)
 
         def is_blocked_user(self, username: str):
             return username in self.__blocked_users

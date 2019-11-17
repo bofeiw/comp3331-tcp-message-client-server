@@ -40,7 +40,7 @@ def recv_handler():
     while True:
         login_result, server_address = clientSocket.recvfrom(2048)
         data = json.loads(login_result.decode())
-        print('\r',end='')
+        print('\r', end='')
         if data['action'] == 'message':
             if data['status'] == 'MESSAGE_SELF':
                 print("Cannot message yourself.")
@@ -50,8 +50,25 @@ def recv_handler():
                 print("That user blocked you.")
             elif data['status'] == 'SUCCESS':
                 pass
-        elif data['action'] == 'receive_message':
+        elif data['action'] in ['receive_message', 'receive_broadcast']:
             print(data["from"], ':', data['message'])
+        elif data['action'] == 'block':
+            if data['status'] == 'MESSAGE_SELF':
+                print("Cannot block yourself.")
+            elif data['status'] == 'USER_NOT_EXIST':
+                print("User does not exist.")
+            else:
+                print("Block success.")
+        elif data['action'] == 'unblock':
+            if data['status'] == 'MESSAGE_SELF':
+                print("Cannot unblock yourself.")
+            elif data['status'] == 'USER_NOT_EXIST':
+                print("User does not exist.")
+            else:
+                print("Unblock success.")
+        elif data['action'] == 'broadcast':
+            print('broadcast success to', data['n_sent'], 'users.', data['n_blocked'],
+                  'users blocked you so they can not see the message.')
         else:
             print(data)
         print('> ', end='')
@@ -71,6 +88,24 @@ def send_handler():
                 "action": "message",
                 "message": message,
                 "user": user
+            }).encode(), (serverName, serverPort))
+        elif command.startswith("broadcast"):
+            _, message = command.split()
+            clientSocket.sendto(json.dumps({
+                "action": "broadcast",
+                "message": message,
+            }).encode(), (serverName, serverPort))
+        elif command.startswith("block"):
+            _, user = command.split()
+            clientSocket.sendto(json.dumps({
+                "action": "block",
+                "user": user,
+            }).encode(), (serverName, serverPort))
+        elif command.startswith("unblock"):
+            _, user = command.split()
+            clientSocket.sendto(json.dumps({
+                "action": "unblock",
+                "user": user,
             }).encode(), (serverName, serverPort))
 
 

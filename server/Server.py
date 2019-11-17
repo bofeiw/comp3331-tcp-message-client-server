@@ -32,9 +32,10 @@ UPDATE_INTERVAL = 1
 # credential manager
 user_manager = UserManager(block_duration, timeout)
 
-def send_message(from_user: str, to_user: str, message: str):
+
+def send_message(from_user: str, to_user: str, message: str, broadcast=False):
     serverSocket.sendto(json.dumps({
-        'action': 'receive_message',
+        'action': 'receive_broadcast' if broadcast else 'receive_message',
         'from': from_user,
         'message': message
     }).encode(), user_manager.get_address(to_user))
@@ -55,12 +56,10 @@ def recv_handler():
 
         # get lock as we might me accessing some shared data structures
         with t_lock:
-            currtime = dt.datetime.now()
-            date_time = currtime.strftime("%d/%m/%Y, %H:%M:%S")
-            print('Received request from', client_address[0], 'listening at', client_address[1], ':', data,
-                  'at time ', date_time)
+            print(client_address, ':', data)
             server_message = dict()
             server_message["action"] = action
+            curr_user = user_manager.get_username(client_address)
             if action == 'login':
                 # store client information (IP and Port No) in list
                 username = data["username"]
@@ -78,14 +77,13 @@ def recv_handler():
                 else:
                     server_message["reply"] = "You are not logged in"
             elif action == 'message':
-                curr_user = user_manager.get_username(client_address)
                 username = data['user']
                 message = data['message']
                 if curr_user == username:
                     server_message['status'] = 'MESSAGE_SELF'
                 elif not user_manager.has_user(username):
                     server_message['status'] = 'USER_NOT_EXIST'
-                elif user_manager.is_blocked_user(curr_user, username):
+                elif user_manager.is_blocked_user(username, curr_user):
                     server_message['status'] = 'USER_BLOCKED'
                 else:
                     server_message['status'] = 'SUCCESS'
@@ -98,7 +96,40 @@ def recv_handler():
                             'to_user': username,
                             'message': message
                         })
-
+            elif action == 'broadcast':
+                message = data['message']
+                n_sent = 0
+                n_blocked = 0
+                for user in user_manager.all_users():
+                    if user_manager.is_blocked_user(user, curr_user):
+                        n_blocked += 1
+                    elif not user_manager.is_online(user):
+                        pass
+                    elif user == curr_user:
+                        pass
+                    else:
+                        n_sent += 1
+                        send_message(curr_user, user, message, broadcast=True)
+                server_message['n_sent'] = n_sent
+                server_message['n_blocked'] = n_blocked
+            elif action == 'block':
+                user_to_block = data['user']
+                if curr_user == user_to_block:
+                    server_message['status'] = 'MESSAGE_SELF'
+                elif not user_manager.has_user(user_to_block):
+                    server_message['status'] = 'USER_NOT_EXIST'
+                else:
+                    server_message['status'] = 'SUCCESS'
+                    user_manager.block(curr_user, user_to_block)
+            elif action == 'unblock':
+                user_to_unblock = data['user']
+                if curr_user == user_to_unblock:
+                    server_message['status'] = 'MESSAGE_SELF'
+                elif not user_manager.has_user(user_to_unblock):
+                    server_message['status'] = 'USER_NOT_EXIST'
+                else:
+                    server_message['status'] = 'SUCCESS'
+                    user_manager.unblock(curr_user, user_to_unblock)
             else:
                 server_message["reply"] = "Unknown action"
             # send message to the client
