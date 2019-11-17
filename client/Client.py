@@ -77,6 +77,12 @@ def recv_handler():
         elif data['action'] == 'timeout':
             to_exit = True
             is_timeout = True
+        elif data['action'] == 'whoelse':
+            print("Online users:")
+            print("\n".join(data['reply']))
+        elif data['action'] == 'whoelsesince':
+            print("whoelsesince:")
+            print("\n".join(data['reply']))
         else:
             print(data)
         print('> ', end='')
@@ -114,6 +120,16 @@ def send_handler():
             clientSocket.sendto(json.dumps({
                 "action": "unblock",
                 "user": user,
+            }).encode(), (serverName, serverPort))
+        elif command.startswith("whoelsesince"):
+            _, since = command.split()
+            clientSocket.sendto(json.dumps({
+                "action": "whoelsesince",
+                "since": since
+            }).encode(), (serverName, serverPort))
+        elif command.startswith("whoelse"):
+            clientSocket.sendto(json.dumps({
+                "action": "whoelse"
             }).encode(), (serverName, serverPort))
 
 

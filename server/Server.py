@@ -131,6 +131,15 @@ def recv_handler():
                 else:
                     server_message['status'] = 'SUCCESS'
                     user_manager.unblock(curr_user, user_to_unblock)
+            elif action == 'whoelse':
+                online_users = user_manager.get_online_users()
+                online_users.remove(curr_user)
+                server_message['reply'] = list(online_users)
+            elif action == 'whoelsesince':
+                users = user_manager.get_users_logged_in_since(int(data['since']))
+                if curr_user in users:
+                    users.remove(curr_user)
+                server_message['reply'] = list(users)
             else:
                 server_message["reply"] = "Unknown action"
             # send message to the client

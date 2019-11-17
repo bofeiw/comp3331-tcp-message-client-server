@@ -87,6 +87,20 @@ class UserManager:
                 timed_out_users.add(user)
         return timed_out_users
 
+    def get_online_users(self) -> set:
+        online_users = set()
+        for user in self.__user_map:
+            if self.__user_map[user].is_online():
+                online_users.add(user)
+        return online_users
+
+    def get_users_logged_in_since(self, since: int) -> set:
+        users = set()
+        for user in self.__user_map:
+            if self.__user_map[user].last_log_in() > time() - since:
+                users.add(user)
+        return users
+
     def refresh_user_timeout(self, username):
         if username in self.__user_map:
             self.__user_map[username].refresh_user_timeout()
@@ -106,6 +120,7 @@ class UserManager:
             self.__blocked_since: int = 0
             self.__inactive_since: int = int(time())
             self.__blocked_users: Set[str] = set()
+            self.__last_login: int = 0
 
         def block(self, username: str):
             self.__blocked_users.add(username)
@@ -140,6 +155,9 @@ class UserManager:
         def refresh_user_timeout(self):
             self.__inactive_since = time()
 
+        def last_log_in(self):
+            return self.__last_login
+
         def authenticate(self, password_input: str):
             # authenticate, return the status of the updated user
 
@@ -162,4 +180,5 @@ class UserManager:
 
             # is able to login. update status
             self.__online = True
+            self.__last_login = int(time())
             return "SUCCESS"
