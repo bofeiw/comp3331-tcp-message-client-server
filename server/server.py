@@ -1,11 +1,11 @@
-# Sample code for Multi-Threaded Server
 # Python 3
-# Usage: python3 UDPserver3.py
+# Usage: python3 server.py server_port block_duration timeout
 # coding: utf-8
+# modified from the starter code
+
 from socket import *
 import threading
 import time
-import datetime as dt
 import json
 from UserManager import UserManager
 import sys
@@ -15,12 +15,10 @@ from typing import List, Dict
 if len(sys.argv) != 4:
     print("invalid command line arguments")
     exit(0)
-# server_port = int(sys.argv[1]) # TODO uncomment this
+serverPort = int(sys.argv[1])
 block_duration = int(sys.argv[2])
 timeout = int(sys.argv[3])
 
-# Server will run on this port
-serverPort = 13856
 t_lock = threading.Condition()
 # will store clients info in this list
 clients = []
@@ -56,7 +54,8 @@ def recv_handler():
 
         # get lock as we might me accessing some shared data structures
         with t_lock:
-            print(client_address, ':', data)
+            # debugging code, uncomment to use
+            # print(client_address, ':', data)
             server_message = dict()
             server_message["action"] = action
             curr_user = user_manager.get_username(client_address)

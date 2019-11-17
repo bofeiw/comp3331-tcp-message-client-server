@@ -181,4 +181,5 @@ class UserManager:
             # is able to login. update status
             self.__online = True
             self.__last_login = int(time())
+            self.refresh_user_timeout()
             return "SUCCESS"

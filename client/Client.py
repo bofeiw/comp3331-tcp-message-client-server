@@ -1,5 +1,5 @@
 # Python 3
-# Usage: python3 UDPClient3.py localhost 12000
+# Usage: python3 client.py server_IP server_port
 # coding: utf-8
 from socket import *
 import json
@@ -8,13 +8,15 @@ import threading
 import time
 import sys
 
-# Server would be running on the same host as Client
-serverName = "localhost"
-serverPort = 13856
+# command line args
+if len(sys.argv) != 3:
+    print("invalid command line arguments")
+    exit(0)
+serverName = sys.argv[1]
+serverPort = int(sys.argv[2])
 
 # would communicate with server after every second
 UPDATE_INTERVAL = 1
-timeout = False
 to_exit = False
 is_timeout = False
 
