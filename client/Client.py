@@ -16,6 +16,7 @@ serverPort = 13856
 UPDATE_INTERVAL = 1
 timeout = False
 to_exit = False
+is_timeout = False
 
 clientSocket = socket(AF_INET, SOCK_DGRAM)
 t_lock = threading.Condition()
@@ -29,14 +30,18 @@ message = json.dumps({
 
 
 def logout():
-    print("\rYou are logged out.")
-    clientSocket.sendto(json.dumps({
-        "action": "logout"
-    }).encode(), (serverName, serverPort))
-    clientSocket.close()
+    if is_timeout:
+        print("\rYou are timed out.")
+    else:
+        print("\rYou are logged out.")
+        clientSocket.sendto(json.dumps({
+            "action": "logout"
+        }).encode(), (serverName, serverPort))
+        clientSocket.close()
 
 
 def recv_handler():
+    global to_exit, is_timeout
     while True:
         login_result, server_address = clientSocket.recvfrom(2048)
         data = json.loads(login_result.decode())
@@ -69,6 +74,9 @@ def recv_handler():
         elif data['action'] == 'broadcast':
             print('broadcast success to', data['n_sent'], 'users.', data['n_blocked'],
                   'users blocked you so they can not see the message.')
+        elif data['action'] == 'timeout':
+            to_exit = True
+            is_timeout = True
         else:
             print(data)
         print('> ', end='')

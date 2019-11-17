@@ -60,6 +60,7 @@ def recv_handler():
             server_message = dict()
             server_message["action"] = action
             curr_user = user_manager.get_username(client_address)
+            user_manager.refresh_user_timeout(curr_user)
             if action == 'login':
                 # store client information (IP and Port No) in list
                 username = data["username"]
@@ -152,6 +153,11 @@ def send_handler():
                 if user_manager.is_online(message['to_user']):
                     send_message(message['from_user'], message['to_user'], message['message'])
                     pending_messages.remove(message)
+            # time out users
+            for user in user_manager.get_timed_out_users():
+                serverSocket.sendto(json.dumps({
+                    'action': 'timeout'
+                }).encode(), user_manager.get_address(user))
             # notify other thread
             t_lock.notify()
         # sleep for UPDATE_INTERVAL

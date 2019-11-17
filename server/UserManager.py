@@ -80,6 +80,17 @@ class UserManager:
     def all_users(self) -> list:
         return list(self.__user_map.keys())
 
+    def get_timed_out_users(self) -> set:
+        timed_out_users = set()
+        for user in self.__user_map:
+            if self.__user_map[user].update_time_out():
+                timed_out_users.add(user)
+        return timed_out_users
+
+    def refresh_user_timeout(self, username):
+        if username in self.__user_map:
+            self.__user_map[username].refresh_user_timeout()
+
     class __User:
         # manage username, password, online status, number of consecutive fail trials,
         # blocked timestamp of a particular user
@@ -93,7 +104,7 @@ class UserManager:
             self.__blocked: bool = False
             self.__consecutive_fails: int = 0
             self.__blocked_since: int = 0
-            self.__inactive_since: int = 0
+            self.__inactive_since: int = int(time())
             self.__blocked_users: Set[str] = set()
 
         def block(self, username: str):
@@ -118,6 +129,16 @@ class UserManager:
 
         def is_online(self):
             return self.__online
+
+        def update_time_out(self):
+            # update time out status, return true if should lof out this user because of timeout
+            if self.is_online() and self.__inactive_since + self.__timeout < time():
+                self.set_offline()
+                return True
+            return False
+
+        def refresh_user_timeout(self):
+            self.__inactive_since = time()
 
         def authenticate(self, password_input: str):
             # authenticate, return the status of the updated user
