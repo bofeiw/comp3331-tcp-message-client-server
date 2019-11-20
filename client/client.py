@@ -7,20 +7,30 @@ import atexit
 import threading
 import time
 import sys
+import signal
+
+
+def keyboard_interrupt_handler(signal, frame):
+    exit(0)
+
+
+signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
 # command line args
 if len(sys.argv) != 3:
     print("invalid command line arguments")
     exit(0)
-serverName = sys.argv[1]
-serverPort = int(sys.argv[2])
+server_name = sys.argv[1]
+server_port = int(sys.argv[2])
 
 # would communicate with server after every second
 UPDATE_INTERVAL = 1
 to_exit = False
 is_timeout = False
 
-clientSocket = socket(AF_INET, SOCK_DGRAM)
+clientSocket = socket(AF_INET, SOCK_STREAM)
+clientSocket.connect((server_name, server_port))
+
 t_lock = threading.Condition()
 
 username = input("username: ")
@@ -36,16 +46,16 @@ def logout():
         print("\rYou are timed out.")
     else:
         print("\rYou are logged out.")
-        clientSocket.sendto(json.dumps({
+        clientSocket.send(json.dumps({
             "action": "logout"
-        }).encode(), (serverName, serverPort))
+        }).encode())
         clientSocket.close()
 
 
 def recv_handler():
     global to_exit, is_timeout
     while True:
-        login_result, server_address = clientSocket.recvfrom(2048)
+        login_result = clientSocket.recv(1024)
         data = json.loads(login_result.decode())
         print('\r', end='')
         if data['action'] == 'message':
@@ -100,39 +110,39 @@ def send_handler():
             to_exit = True
         elif command.startswith("message"):
             _, user, message = command.split(' ', 2)
-            clientSocket.sendto(json.dumps({
+            clientSocket.send(json.dumps({
                 "action": "message",
                 "message": message,
                 "user": user
-            }).encode(), (serverName, serverPort))
+            }).encode())
         elif command.startswith("broadcast"):
             _, message = command.split()
-            clientSocket.sendto(json.dumps({
+            clientSocket.send(json.dumps({
                 "action": "broadcast",
                 "message": message,
-            }).encode(), (serverName, serverPort))
+            }).encode())
         elif command.startswith("block"):
             _, user = command.split()
-            clientSocket.sendto(json.dumps({
+            clientSocket.send(json.dumps({
                 "action": "block",
                 "user": user,
-            }).encode(), (serverName, serverPort))
+            }).encode())
         elif command.startswith("unblock"):
             _, user = command.split()
-            clientSocket.sendto(json.dumps({
+            clientSocket.send(json.dumps({
                 "action": "unblock",
                 "user": user,
-            }).encode(), (serverName, serverPort))
+            }).encode())
         elif command.startswith("whoelsesince"):
             _, since = command.split()
-            clientSocket.sendto(json.dumps({
+            clientSocket.send(json.dumps({
                 "action": "whoelsesince",
                 "since": since
-            }).encode(), (serverName, serverPort))
+            }).encode())
         elif command.startswith("whoelse"):
-            clientSocket.sendto(json.dumps({
+            clientSocket.send(json.dumps({
                 "action": "whoelse"
-            }).encode(), (serverName, serverPort))
+            }).encode())
 
 
 def interact():
@@ -152,9 +162,9 @@ def interact():
 
 def log_in():
     global message
-    clientSocket.sendto(message.encode(), (serverName, serverPort))
+    clientSocket.send(message.encode())
     # wait for the reply from the server
-    login_result, server_address = clientSocket.recvfrom(2048)
+    login_result = clientSocket.recv(1024)
     login_result = json.loads(login_result.decode())
     if login_result["action"] == 'login' and login_result["status"] == "SUCCESS":
         print("You are logged in")
