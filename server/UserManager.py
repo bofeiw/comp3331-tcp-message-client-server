@@ -1,9 +1,16 @@
+# Python 3.7
+# Author: Bofei Wang
+# coding: utf-8
+# this file contains the UserManager class for the server to use
+
 from typing import Dict, Set
 from time import time
 
 
 class UserManager:
-    # manage all credentials and status of all users
+    # manage all user data, including credentials, block status,
+    # user-to-user block status, time out, online status,
+    # and last login status
 
     def __init__(self, block_duration: int, time_out: int):
         self.__user_map: Dict[str, UserManager.__User] = dict()
@@ -27,7 +34,7 @@ class UserManager:
 
     def authenticate(self, username_input: str, password_input: str):
         # authenticate user and update status
-        # return updated status
+        # return updated status in a string format
 
         if username_input not in self.__user_map:
             # username unknown
@@ -57,6 +64,7 @@ class UserManager:
             self.__user_map[username].set_offline()
 
     def update(self):
+        # update all user's block status
         for user_credential in self.__user_map.values():
             user_credential.update()
 
@@ -69,6 +77,7 @@ class UserManager:
             self.__user_map[from_username].unblock(to_block_username)
 
     def is_blocked_user(self, from_username: str, to_block_username: str):
+        # if from user blocked to user
         return from_username in self.__user_map and self.__user_map[from_username].is_blocked_user(to_block_username)
 
     def has_user(self, username):
@@ -78,9 +87,11 @@ class UserManager:
         return username in self.__user_map and self.__user_map[username].is_online()
 
     def all_users(self) -> list:
+        # return a list of all username
         return list(self.__user_map.keys())
 
     def get_timed_out_users(self) -> set:
+        # return a set of all users that should be timed out
         timed_out_users = set()
         for user in self.__user_map:
             if self.__user_map[user].update_time_out():
@@ -95,6 +106,7 @@ class UserManager:
         return online_users
 
     def get_users_logged_in_since(self, since: int) -> set:
+        # return a set of username tha is logged in since a time
         users = set()
         for user in self.__user_map:
             if self.__user_map[user].last_log_in() > time() - since:
@@ -102,12 +114,13 @@ class UserManager:
         return users
 
     def refresh_user_timeout(self, username):
+        # update a user's last active time
         if username in self.__user_map:
             self.__user_map[username].refresh_user_timeout()
 
     class __User:
         # manage username, password, online status, number of consecutive fail trials,
-        # blocked timestamp of a particular user
+        # blocked timestamp, last active time, last login of a particular user
 
         def __init__(self, username: str, password: str, block_duration: int, timeout: int):
             self.__username: str = username

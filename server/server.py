@@ -1,48 +1,58 @@
-# Python 3
+# Python 3.7
+# Author: Bofei Wang
 # Usage: python3 server.py server_port block_duration timeout
 # coding: utf-8
-# modified from the starter code
+# modified from the multi-threading sample code
 
-from socket import *
 import threading
 import time
 import json
-from UserManager import UserManager
 import sys
-from typing import List, Dict
 import atexit
 import signal
+from socket import *
+from typing import List, Dict
+from UserManager import UserManager
 
 # command line args
 if len(sys.argv) != 4:
-    print("invalid command line arguments")
+    print("Usage: python3 server.py server_port block_duration timeout")
     exit(0)
 serverPort = int(sys.argv[1])
 block_duration = int(sys.argv[2])
 timeout = int(sys.argv[3])
 
+# exclusive lock for multi threading
 t_lock = threading.Condition()
+
 # will store clients info in this list
 clients = []
+
 # all unsent messages: from_user, to_user, message
 pending_messages: List[Dict] = []
+
+# map username to connection socket
 name_to_socket: Dict = dict()
-addr_to_socket: Dict = dict()
+
 # would communicate with clients after every second
 UPDATE_INTERVAL = 1
 
-# credential manager
+# user manager manages all the user data
 user_manager = UserManager(block_duration, timeout)
 
 
+# catch the ctrl+c exit signal
 def keyboard_interrupt_handler(signal, frame):
     print("\rServer is shutdown")
     exit(0)
 
 
-signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+# close the socket when exit
+def on_close():
+    serverSocket.close()
 
 
+# helper function to send a message
 def send_message(from_user: str, to_user: str, message: str, broadcast=False):
     if to_user not in name_to_socket:
         print('ERROR', to_user, 'not exist')
@@ -55,14 +65,16 @@ def send_message(from_user: str, to_user: str, message: str, broadcast=False):
     }).encode())
 
 
-# return a function for multi threading
+# return a function as connection handler for a specific socket for multi threading
 def connection_handler(connection_socket, client_address):
     def real_connection_handler():
         while True:
             data = connection_socket.recv(1024)
             if not data:
+                # if data is empty, the socket is closed or is in the
+                # process of closing. In this case, close this thread
                 exit(0)
-            sys.stdout.flush()
+
             # received data from the client, now we know who we are talking with
             data = data.decode()
             data = json.loads(data)
@@ -71,22 +83,30 @@ def connection_handler(connection_socket, client_address):
             # get lock as we might me accessing some shared data structures
             with t_lock:
                 # debugging code, uncomment to use
-                print(client_address, ':', data)
+                # print(client_address, ':', data)
+
+                # the data to reply to client
                 server_message = dict()
                 server_message["action"] = action
+
+                # current user name
                 curr_user = user_manager.get_username(client_address)
+
+                # update the time out when user send anything to server
                 user_manager.refresh_user_timeout(curr_user)
+
                 if action == 'login':
                     # store client information (IP and Port No) in list
                     username = data["username"]
                     password = data["password"]
                     clients.append(client_address)
+                    # auth the user and reply the status
                     status = user_manager.authenticate(username, password)
                     user_manager.set_address_username(client_address, username)
                     server_message["status"] = status
                     if status == 'SUCCESS':
+                        # add the socket to the name-socket map
                         name_to_socket[username] = connection_socket
-                        addr_to_socket[client_address] = connection_socket
                 elif action == 'logout':
                     # check if client already subscribed or not
                     user_manager.set_offline(user_manager.get_username(client_address))
@@ -96,6 +116,7 @@ def connection_handler(connection_socket, client_address):
                     else:
                         server_message["reply"] = "You are not logged in"
                 elif action == 'message':
+                    # user tries to send a message to other users
                     username = data['user']
                     message = data['message']
                     if curr_user == username:
@@ -107,15 +128,18 @@ def connection_handler(connection_socket, client_address):
                     else:
                         server_message['status'] = 'SUCCESS'
                         if user_manager.is_online(username):
-                            # send message to user
+                            # user is online, send message to user
                             send_message(curr_user, username, message)
                         else:
+                            # user is offline, add message to pending list
                             pending_messages.append({
                                 'from_user': curr_user,
                                 'to_user': username,
                                 'message': message
                             })
                 elif action == 'broadcast':
+                    # broadcast the message to online unblocked users
+                    # record the statistics
                     message = data['message']
                     n_sent = 0
                     n_blocked = 0
@@ -151,11 +175,13 @@ def connection_handler(connection_socket, client_address):
                         user_manager.unblock(curr_user, user_to_unblock)
                 elif action == 'whoelse':
                     online_users = user_manager.get_online_users()
+                    # remove the user who requested
                     online_users.remove(curr_user)
                     server_message['reply'] = list(online_users)
                 elif action == 'whoelsesince':
                     users = user_manager.get_users_logged_in_since(int(data['since']))
                     if curr_user in users:
+                        # remove the user who requested
                         users.remove(curr_user)
                     server_message['reply'] = list(users)
                 else:
@@ -168,30 +194,34 @@ def connection_handler(connection_socket, client_address):
     return real_connection_handler
 
 
+# handles all incoming data and replies to those
 def recv_handler():
     global t_lock
     global clients
     global serverSocket
-    print('Server is ready for service')
+    print('Server is up.')
     while True:
+        # create a new connection for a new client
         connection_socket, client_address = serverSocket.accept()
-        print(connection_socket, client_address)
 
+        # create a new function handler for the client
         socket_handler = connection_handler(connection_socket, client_address)
 
+        # create a new thread for the client socket
         socket_thread = threading.Thread(name=str(client_address), target=socket_handler)
         socket_thread.daemon = False
         socket_thread.start()
 
 
+# handles all out going data that can not be handled by recev_dandler
 def send_handler():
     global t_lock
     global clients
     global serverSocket
-    # go through the list of the subscribed clients and send them the current time after every 1 second
     while True:
         # get lock
         with t_lock:
+            # check if any pending messages can be send to any users who is online
             for message in pending_messages:
                 if user_manager.is_online(message['to_user']):
                     send_message(message['from_user'], message['to_user'], message['message'])
@@ -221,13 +251,15 @@ send_thread = threading.Thread(name="SendHandler", target=send_handler)
 send_thread.daemon = True
 send_thread.start()
 
+# register keyboard interrupt handler
+signal.signal(signal.SIGINT, keyboard_interrupt_handler)
 
-def on_close():
-    serverSocket.close()
-
-
+# register exist handler
 atexit.register(on_close)
+
 # this is the main thread
 while True:
     time.sleep(0.1)
+
+    # update any information of all user data
     user_manager.update()
