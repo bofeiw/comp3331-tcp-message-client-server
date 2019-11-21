@@ -63,3 +63,4 @@ Yay - it works under most of common circumstances on CSE machine!
 ## Segments Of Code That You Have Borrowed
 
 - `server.py` and `client.py` is developed based on the multi-threading codes provided by COMP3331.
+- https://stackoverflow.com/a/4653306/12208789 at client.py to prevent having the prompt overwritten by other threads in Python

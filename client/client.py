@@ -10,6 +10,7 @@ import threading
 import time
 import sys
 import signal
+import readline
 from socket import *
 
 
@@ -69,7 +70,8 @@ def recv_handler():
     while True:
         login_result = clientSocket.recv(1024)
         data = json.loads(login_result.decode())
-        print('\r', end='')
+        # https://stackoverflow.com/a/4653306/12208789 resolve line buffer issue
+        sys.stdout.write('\r' + ' ' * (len(readline.get_line_buffer()) + 2) + '\r')
         if data['action'] == 'message':
             # reply to a user-initiated message
             if data['status'] == 'MESSAGE_SELF':
@@ -119,7 +121,7 @@ def recv_handler():
         else:
             # unexpected format
             print(data)
-        print('> ', end='')
+        sys.stdout.write('> ' + readline.get_line_buffer())
 
         # flush the stdout
         sys.stdout.flush()
