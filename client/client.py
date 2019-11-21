@@ -118,6 +118,12 @@ def recv_handler():
             # reply to a user-initiated whoelsesince
             print("whoelsesince:")
             print("\n".join(data['reply']))
+        elif data['action'] == 'login_broadcast':
+            # receive login braodcast
+            print(data['from'], 'is logged in.')
+        elif data['action'] == 'logout_broadcast':
+            # receive login braodcast
+            print(data['from'], 'is logged out.')
         else:
             # unexpected format
             print(data)

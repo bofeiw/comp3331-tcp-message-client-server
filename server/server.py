@@ -53,16 +53,24 @@ def on_close():
 
 
 # helper function to send a message
-def send_message(from_user: str, to_user: str, message: str, broadcast=False):
+def send_message(from_user: str, to_user: str, message: str, broadcast=False, login_broadcast=False,
+                 logout_broadcast=False):
     if to_user not in name_to_socket:
         print('ERROR', to_user, 'not exist')
-        return
-    to_user_socket = name_to_socket[to_user]
-    to_user_socket.send(json.dumps({
-        'action': 'receive_broadcast' if broadcast else 'receive_message',
-        'from': from_user,
-        'message': message
-    }).encode())
+    else:
+        to_user_socket = name_to_socket[to_user]
+        action = 'receive_message'
+        if broadcast:
+            action = 'receive_broadcast'
+        elif login_broadcast:
+            action = 'login_broadcast'
+        elif logout_broadcast:
+            action = 'logout_broadcast'
+        to_user_socket.send(json.dumps({
+            'action': action,
+            'from': from_user,
+            'message': message
+        }).encode())
 
 
 # return a function as connection handler for a specific socket for multi threading
@@ -107,12 +115,20 @@ def connection_handler(connection_socket, client_address):
                     if status == 'SUCCESS':
                         # add the socket to the name-socket map
                         name_to_socket[username] = connection_socket
+                        # broadcast new user login
+                        for user in user_manager.all_users():
+                            if user != username and user_manager.is_online(user):
+                                send_message(username, user, '', login_broadcast=True)
                 elif action == 'logout':
                     # check if client already subscribed or not
                     user_manager.set_offline(user_manager.get_username(client_address))
                     if client_address in clients:
                         clients.remove(client_address)
                         server_message["reply"] = "logged out"
+                        # broadcast user logout
+                        for user in user_manager.all_users():
+                            if user != curr_user and user_manager.is_online(user):
+                                send_message(curr_user, user, '', logout_broadcast=True)
                     else:
                         server_message["reply"] = "You are not logged in"
                 elif action == 'message':
