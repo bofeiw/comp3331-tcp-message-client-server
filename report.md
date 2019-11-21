@@ -40,6 +40,8 @@ On server starts, it starts to listen to every new connections and create a thre
 
 On client starts, it establish a TCP connection to the server and creates two threads - one for displaying server incoming messages and another for handling user inputs and send the messages to the server.
 
+P2P is implemented by client retrieving address and port number of another client and establish a TCP connection directly with another user.
+
 ## Design trade offs
 
 One of the trade off is to use multi-processing or multi-threading. Multi-threading is chosen because it is easier to manager the communications between threads.
@@ -54,11 +56,13 @@ Efficiencies of the messaging application can be improved. Currently server chec
 
 ## Extensions And How You Could Realise Them
 
-Sadly no extensions exist.
+P2P messaging is implemented.
 
 ## Does Not Work Under Any Particular Circumstances
 
 Yay - it works under most of common circumstances on CSE machine!
+
+If you are unable to run the server in a particular port, try a different one - that port may be busy.
 
 ## Segments Of Code That You Have Borrowed
 

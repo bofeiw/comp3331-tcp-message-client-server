@@ -113,6 +113,7 @@ def private_recv_handler():
     while True:
         # create a new connection for a new client
         connection_socket, client_address = private_recv_socket.accept()
+        safe_print('Private connection started.')
 
         # create a new function handler for the client
         private_socket_handler = private_connection_handler(connection_socket, client_address)
