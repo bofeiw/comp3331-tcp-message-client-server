@@ -118,6 +118,15 @@ class UserManager:
         if username in self.__user_map:
             self.__user_map[username].refresh_user_timeout()
 
+    def set_private_port(self, username: str, port: int):
+        if username in self.__user_map:
+            self.__user_map[username].set_private_port(port)
+
+    def get_private_port(self, username: str):
+        if username in self.__user_map:
+            return self.__user_map[username].get_private_port()
+        return 0
+
     class __User:
         # manage username, password, online status, number of consecutive fail trials,
         # blocked timestamp, last active time, last login of a particular user
@@ -134,6 +143,7 @@ class UserManager:
             self.__inactive_since: int = int(time())
             self.__blocked_users: Set[str] = set()
             self.__last_login: int = 0
+            self.__private_port: int = 0
 
         def block(self, username: str):
             self.__blocked_users.add(username)
@@ -141,6 +151,12 @@ class UserManager:
         def unblock(self, username: str):
             if username in self.__blocked_users:
                 self.__blocked_users.remove(username)
+
+        def set_private_port(self, port: int):
+            self.__private_port = port
+
+        def get_private_port(self):
+            return self.__private_port
 
         def is_blocked_user(self, username: str):
             return username in self.__blocked_users
@@ -154,6 +170,7 @@ class UserManager:
             self.__online = False
             self.__consecutive_fails = 0
             self.__blocked_since = 0
+            self.__private_port = 0
 
         def is_online(self):
             return self.__online

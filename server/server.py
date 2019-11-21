@@ -115,6 +115,7 @@ def connection_handler(connection_socket, client_address):
                     if status == 'SUCCESS':
                         # add the socket to the name-socket map
                         name_to_socket[username] = connection_socket
+                        user_manager.set_private_port(username, int(data['private_port']))
                         # broadcast new user login
                         for user in user_manager.all_users():
                             if user != username and user_manager.is_online(user):
@@ -200,6 +201,25 @@ def connection_handler(connection_socket, client_address):
                         # remove the user who requested
                         users.remove(curr_user)
                     server_message['reply'] = list(users)
+                elif action == 'startprivate':
+                    # return user address and port if available
+                    user = data['user']
+                    if not user_manager.has_user(user):
+                        server_message['reply'] = 'USER_NOT_EXIST'
+                    elif user_manager.is_blocked_user(user, curr_user):
+                        server_message['reply'] = 'USER_BLOCKED'
+                    elif user == curr_user:
+                        server_message['reply'] = 'USER_SELF'
+                    elif not user_manager.is_online(user):
+                        server_message['reply'] = 'USER_OFFLINE'
+                    else:
+                        # can provide user details to user
+                        server_message['reply'] = 'SUCCESS'
+                        user_socket = name_to_socket[user]
+                        user_address = user_socket.getsockname()[0]
+                        server_message['address'] = user_address
+                        server_message['port'] = user_manager.get_private_port(user)
+                        server_message['username'] = user
                 else:
                     server_message["reply"] = "Unknown action"
                 # send message to the client
@@ -245,6 +265,7 @@ def send_handler():
             # time out users
             for user in user_manager.get_timed_out_users():
                 if user in name_to_socket:
+                    user_manager.set_offline(user)
                     name_to_socket[user].send(json.dumps({
                         'action': 'timeout'
                     }).encode())
