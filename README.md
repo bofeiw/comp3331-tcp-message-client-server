@@ -1,5 +1,9 @@
 # Comp3331 Assignment Report - Bofei Wang
 
+This is my solution to the computer network (COMP3331) assignment at UNSW, 2019 term 3.
+
+**If there are any similar assignments in the future, do not copy directly but use as a reference only wisely.**
+
 ## Program Design
 
 Structure:  
